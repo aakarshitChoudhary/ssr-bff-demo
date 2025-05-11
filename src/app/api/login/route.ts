@@ -11,7 +11,7 @@ edgeRouter.use(applySession).post(async (req, res) => {
 
   try {
     // Send request to external API for authentication
-    const response = await http.post("https://dummyjson.com/auth/login", {
+    const response = await http.post("/auth/login", {
       username,
       password,
     });
