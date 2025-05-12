@@ -1,54 +1,34 @@
-export const runtime = "nodejs";
-
-import { applySession } from "@/app/api/session";
-import http from "@/lib/http.service";
-import { createEdgeRouter } from "next-connect";
+// app/api/login/route.ts
 import { NextResponse } from "next/server";
-import { redisClient } from "@/app/api/redis";
-import { CustomNextRequest } from "@/app/types/types";
-import { RequestContext } from "next/dist/server/base-server";
+import http from "@/lib/http.service";
+import { createSession } from "@/app/api/session";
+import { getRedisClient } from "@/app/api/redis";
 
-const edgeRouter = createEdgeRouter<CustomNextRequest, RequestContext>();
-
-edgeRouter.use(applySession).post(async (req) => {
-  const { username, password } = await req.json();
-
+export async function POST(req: Request) {
   try {
-    const response = await http.post("/auth/login", {
-      username,
-      password,
-    });
+    const { username, password } = await req.json();
 
+    // 1) authenticate via your backend
+    const response = await http.post("/auth/login", { username, password });
     const { accessToken } = response.data;
 
-    req.session.token = accessToken;
-    await req.session.save();
+    // 2) create + store session in Redis, set cookie
+    const sessionId = await createSession({ token: accessToken });
 
-    console.log("SessionID:", req.sessionID);
+    console.log("New SessionID:", sessionId);
 
-    const redisRaw = await redisClient.get(`sess:${req.sessionID}`);
-    console.log("Session data in Redis:", redisRaw ?? "No session found");
+    // 3) verify it’s really in Redis (optional)
+    const client = getRedisClient();
+    const redisRaw = await client.get(`session:${sessionId}`);
+    console.log("Session data in Redis:", redisRaw);
 
-    const loginResponse = NextResponse.json({ message: "Login successful" });
-
-    loginResponse.cookies.set("connect.sid", req.sessionID, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24, // 1 day in seconds
-    });
-
-    return loginResponse;
-  } catch (error) {
-    console.error("Login error:", error);
+    // 4) return success
+    return NextResponse.json({ message: "Login successful" });
+  } catch (err: any) {
+    console.error("Login error:", err);
     return NextResponse.json(
-      { message: "Error during login" },
-      { status: 500 }
+      { message: err?.message || "Login failed" },
+      { status: 401 }
     );
   }
-});
-
-export async function POST(request: CustomNextRequest, ctx: RequestContext) {
-  return edgeRouter.run(request, ctx) as Promise<NextResponse>;
 }

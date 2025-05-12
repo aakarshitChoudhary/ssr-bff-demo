@@ -1,6 +1,12 @@
-const Redis = require("ioredis");
+import { createClient, RedisClientType } from "redis";
 
-export const redisClient = new Redis(process.env.REDIS_URL);
-redisClient.on("error", (err: any) => {
-  console.error("Redis Client Error:", err);
-});
+let client: RedisClientType | null = null;
+
+export function getRedisClient(): RedisClientType {
+  if (!client) {
+    client = createClient({ url: process.env.REDIS_URL });
+    client.on("error", (err) => console.error("Redis Error:", err));
+    client.connect().catch((err) => console.error("Redis Connect Error:", err));
+  }
+  return client;
+}

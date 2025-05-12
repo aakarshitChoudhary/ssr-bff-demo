@@ -10,7 +10,7 @@ import ProductList from "@/components/ProductList";
 export default async function Page() {
   /* This cookie part can be converted into an reusable server-side method to fetch cookies */
   const cookieStore = await cookies();
-  const sessionId = cookieStore.get("connect.sid")?.value;
+  const sessionId = cookieStore.get("sessionId")?.value;
 
   /* This part can be extracted out in another server side component to simplify the page.tsx */
   const queryClient = new QueryClient();
@@ -19,7 +19,7 @@ export default async function Page() {
     queryKey: ["products"],
     queryFn: () =>
       getProducts({
-        Cookie: `connect.sid=${sessionId}`,
+        Cookie: `sessionId=${sessionId}`,
       }),
   });
 
